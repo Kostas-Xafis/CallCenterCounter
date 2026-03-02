@@ -1,0 +1,19 @@
+name = "call-center-counter"
+main = "src/index.ts"
+compatibility_date = "2026-03-02"
+
+[vars]
+APP_ENV = "development"
+SESSION_COOKIE_NAME = "cc_session"
+AUTH_PEPPER = "replace-in-secrets"
+TURSO_DATABASE_URL = ""
+TURSO_AUTH_TOKEN = ""
+
+[[d1_databases]]
+binding = "DB"
+database_name = "call_center_dev"
+database_id = "replace-with-your-d1-id"
+
+[env.production.vars]
+APP_ENV = "production"
+SESSION_COOKIE_NAME = "cc_session"
