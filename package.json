@@ -9,8 +9,8 @@
     "typecheck": "tsc --noEmit",
     "db:delete:local": "wrangler d1 execute call_center_dev --local --file=./db/delete.sql",
     "db:migrate:local": "wrangler d1 execute call_center_dev --local --file=./db/schema.sql",
-    "db:delete:prod": "wrangler d1 execute call_center_prod --file=./db/delete.sql",
-    "db:migrate:prod": "wrangler d1 execute call_center_prod --file=./db/schema.sql",
+    "db:delete:prod": "wrangler d1 execute call_center_prod --remote --env production --file=./db/delete.sql",
+    "db:migrate:prod": "wrangler d1 execute call_center_prod --remote --env production --file=./db/schema_prod.sql",
     "hash:password": "tsx ./scripts/hash-password.ts"
   },
   "devDependencies": {
