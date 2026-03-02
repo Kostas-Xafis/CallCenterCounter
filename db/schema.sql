@@ -25,15 +25,26 @@ CREATE TABLE IF NOT EXISTS calls (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS signup_invites (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TEXT NOT NULL,
+  used_at TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_calls_user_created_at ON calls(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_calls_created_at ON calls(created_at);
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_signup_invites_email ON signup_invites(email);
+CREATE INDEX IF NOT EXISTS idx_signup_invites_expires_at ON signup_invites(expires_at);
 
 INSERT OR IGNORE INTO users (email, first_name, last_name, password_hash)
 VALUES (
-  'dummy.agent@callcenter.local',
-  'Dummy',
-  'Agent',
-  'd7b46c5c8838dc1a216b051af41c63a65ec2c8387d8485cf580a63f8975f074c'
+  'koxafis@gmail.com',
+  'Κωνσταντίνος',
+  'Χαφής',
+  'a6af35d701e1e2b9b1cfdb68804b48c337bf6e1ea634c82758987581ee6e5175'
 );
