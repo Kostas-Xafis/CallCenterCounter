@@ -335,6 +335,7 @@ export function appPage(userName: string, showInviteLink = false): string {
     <div class="card stack">
       <p class="muted">Click on every incoming call.</p>
       <button id="increment" class="button-call"><i class="fa-solid fa-plus icon" aria-hidden="true"></i>Add incoming call</button>
+      <button id="decrement" class="primary"><i class="fa-solid fa-rotate-left icon" aria-hidden="true"></i>Remove last call</button>
       <div id="increment-error" class="error"></div>
     </div>`,
     `<script>
@@ -360,6 +361,19 @@ export function appPage(userName: string, showInviteLink = false): string {
 
         const data = await response.json().catch(() => ({}));
         incrementError.textContent = data.error || 'Unable to update call counter right now.';
+      });
+
+      document.getElementById('decrement').addEventListener('click', async () => {
+        const incrementError = document.getElementById('increment-error');
+        incrementError.textContent = '';
+        const response = await fetch('/api/calls/remove-last', { method: 'POST' });
+        if (response.ok) {
+          refreshSummary();
+          return;
+        }
+
+        const data = await response.json().catch(() => ({}));
+        incrementError.textContent = data.error || 'Unable to remove the last call right now.';
       });
 
       refreshSummary();
