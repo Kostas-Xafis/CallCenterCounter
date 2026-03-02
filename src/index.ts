@@ -307,16 +307,17 @@ export default {
 
         const repo = getRepository(env);
         const userDisplayName = `${user.first_name} ${user.last_name}`.trim() || user.email;
+        const isAdminUser = isAdminEmail(user.email);
 
         if (path === "/admin/invites" && method === "GET") {
-            if (!isAdminEmail(user.email)) {
+            if (!isAdminUser) {
                 return new Response("Forbidden", { status: 403 });
             }
-            return html(inviteGeneratorPage(userDisplayName));
+            return html(inviteGeneratorPage(userDisplayName, isAdminUser));
         }
 
         if (path === "/api/admin/invites" && method === "POST") {
-            if (!isAdminEmail(user.email)) {
+            if (!isAdminUser) {
                 return json({ error: "Forbidden" }, 403);
             }
 
@@ -347,7 +348,7 @@ export default {
         }
 
         if (path === "/app" && method === "GET") {
-            return html(appPage(userDisplayName));
+            return html(appPage(userDisplayName, isAdminUser));
         }
 
         if (path === "/stats" && method === "GET") {
@@ -355,19 +356,19 @@ export default {
         }
 
         if (path === "/stats/weekly" && method === "GET") {
-            return html(statsWeeklyPage(userDisplayName));
+            return html(statsWeeklyPage(userDisplayName, isAdminUser));
         }
 
         if (path === "/stats/monthly" && method === "GET") {
-            return html(statsMonthlyPage(userDisplayName));
+            return html(statsMonthlyPage(userDisplayName, isAdminUser));
         }
 
         if (path === "/stats/all-time" && method === "GET") {
-            return html(statsAllTimePage(userDisplayName));
+            return html(statsAllTimePage(userDisplayName, isAdminUser));
         }
 
         if (path === "/stats/total" && method === "GET") {
-            return html(statsTotalPage(userDisplayName));
+            return html(statsTotalPage(userDisplayName, isAdminUser));
         }
 
         if (path === "/api/me" && method === "GET") {

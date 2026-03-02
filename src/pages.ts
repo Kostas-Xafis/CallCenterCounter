@@ -1,4 +1,5 @@
 type StatsView = "weekly" | "monthly" | "all-time" | "total";
+type NavView = "app" | "invites" | StatsView;
 
 function shell(title: string, body: string, scripts = ""): string {
   return `<!doctype html>
@@ -177,7 +178,7 @@ ${scripts}
 </html>`;
 }
 
-function sidebar(active: "app" | StatsView, userName: string): string {
+function sidebar(active: NavView, userName: string, showInviteLink: boolean): string {
   return `<aside class="sidebar">
       <div class="sidebar-header">
         <div class="brand"><i class="fa-solid fa-headset icon icon-primary" aria-hidden="true"></i>Call Center Counter</div>
@@ -190,6 +191,7 @@ function sidebar(active: "app" | StatsView, userName: string): string {
         </div>
         <nav class="nav nav-main">
           <a class="${active === "app" ? "active" : ""}" href="/app"><i class="fa-solid fa-house icon" aria-hidden="true"></i>Counter</a>
+          ${showInviteLink ? `<a class="${active === "invites" ? "active" : ""}" href="/admin/invites"><i class="fa-solid fa-link icon" aria-hidden="true"></i>Invites</a>` : ""}
           <a class="${active === "weekly" ? "active" : ""}" href="/stats/weekly"><i class="fa-solid fa-chart-line icon" aria-hidden="true"></i>Weekly</a>
           <a class="${active === "monthly" ? "active" : ""}" href="/stats/monthly"><i class="fa-solid fa-calendar-days icon" aria-hidden="true"></i>Monthly</a>
           <a class="${active === "all-time" ? "active" : ""}" href="/stats/all-time"><i class="fa-solid fa-trophy icon" aria-hidden="true"></i>All-Time</a>
@@ -202,11 +204,11 @@ function sidebar(active: "app" | StatsView, userName: string): string {
     </aside>`;
 }
 
-function authLayout(title: string, active: "app" | StatsView, userName: string, content: string, scripts = ""): string {
+function authLayout(title: string, active: NavView, userName: string, content: string, scripts = "", showInviteLink = false): string {
   return shell(
     title,
     `<div class="layout">
-      ${sidebar(active, userName)}
+      ${sidebar(active, userName, showInviteLink)}
       <main class="main">
         <div class="container">${content}</div>
       </main>
@@ -307,7 +309,7 @@ export function loginPage(): string {
   );
 }
 
-export function appPage(userName: string): string {
+export function appPage(userName: string, showInviteLink = false): string {
   return authLayout(
     "Call Counter",
     "app",
@@ -362,6 +364,7 @@ export function appPage(userName: string): string {
 
       refreshSummary();
     </script>`,
+    showInviteLink,
   );
 }
 
@@ -447,7 +450,7 @@ function chartScripts(scope: "user" | "total", chartId: string, source: "daily" 
     </script>`;
 }
 
-export function statsWeeklyPage(userName: string): string {
+export function statsWeeklyPage(userName: string, showInviteLink = false): string {
   return authLayout(
     "Weekly Stats",
     "weekly",
@@ -458,10 +461,11 @@ export function statsWeeklyPage(userName: string): string {
       <canvas id="weeklyChart"></canvas>
     </div>`,
     chartScripts("user", "weeklyChart", "daily", "User calls (last 7 days)"),
+    showInviteLink,
   );
 }
 
-export function statsMonthlyPage(userName: string): string {
+export function statsMonthlyPage(userName: string, showInviteLink = false): string {
   return authLayout(
     "Monthly Stats",
     "monthly",
@@ -472,10 +476,11 @@ export function statsMonthlyPage(userName: string): string {
       <canvas id="monthlyChart"></canvas>
     </div>`,
     chartScripts("user", "monthlyChart", "weekly", "User weekly calls (last month)"),
+    showInviteLink,
   );
 }
 
-export function statsAllTimePage(userName: string): string {
+export function statsAllTimePage(userName: string, showInviteLink = false): string {
   return authLayout(
     "All-Time Stats",
     "all-time",
@@ -508,10 +513,11 @@ export function statsAllTimePage(userName: string): string {
           '<div class="metric-card"><div class="metric-label">Last call</div><div class="metric-value">' + last + '</div></div>';
       })();
     </script>`,
+    showInviteLink,
   );
 }
 
-export function statsTotalPage(userName: string): string {
+export function statsTotalPage(userName: string, showInviteLink = false): string {
   return authLayout(
     "Total Stats",
     "total",
@@ -632,13 +638,14 @@ export function statsTotalPage(userName: string): string {
           '<div class="metric-card"><div class="metric-label">Last call</div><div class="metric-value">' + last + '</div></div>';
       })();
     </script>`,
+    showInviteLink,
   );
 }
 
-export function inviteGeneratorPage(userName: string): string {
+export function inviteGeneratorPage(userName: string, showInviteLink = false): string {
   return authLayout(
     "Invite Signup",
-    "app",
+    "invites",
     userName,
     `<div class="card stack">
       <h1><i class="fa-solid fa-link icon icon-primary" aria-hidden="true"></i>Create signup link</h1>
@@ -683,6 +690,7 @@ export function inviteGeneratorPage(userName: string): string {
         inviteUrlInput.value = data.inviteUrl;
       });
     </script>`,
+    showInviteLink,
   );
 }
 
