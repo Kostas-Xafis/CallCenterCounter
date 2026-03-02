@@ -1,11 +1,16 @@
-import { createClient, type Client, type InValue } from "@libsql/client/web";
+import { D1Database } from "@cloudflare/workers-types";
 import type { AllTimeStats, DailyPoint, Env, User, WeeklyPoint } from "./types";
 
 interface DatabaseAdapter {
     getUserByEmail(email: string): Promise<User | null>;
-    getUserBySessionTokenHash(tokenHash: string): Promise<{ id: number; email: string; } | null>;
+    getUserBySessionTokenHash(tokenHash: string): Promise<{ id: number; email: string; first_name: string; last_name: string; } | null>;
+    createUser(email: string, firstName: string, lastName: string, passwordHash: string): Promise<void>;
     createSession(userId: number, tokenHash: string, expiresAt: string): Promise<void>;
     deleteSession(tokenHash: string): Promise<void>;
+    cleanupExpiredInvites(): Promise<void>;
+    createSignupInvite(email: string, tokenHash: string, expiresAt: string): Promise<void>;
+    getSignupInviteByTokenHash(tokenHash: string): Promise<{ id: number; email: string; expires_at: string; used_at: string | null; } | null>;
+    deleteSignupInviteById(id: number): Promise<void>;
     getSecondsUntilNextCall(userId: number): Promise<number>;
     insertCall(userId: number): Promise<void>;
     getUserSummary(userId: number): Promise<{ todayCalls: number; totalCalls: number; }>;
@@ -15,50 +20,29 @@ interface DatabaseAdapter {
 }
 
 interface Queryable {
-    first<T>(sql: string, args?: InValue[]): Promise<T | null>;
-    all<T>(sql: string, args?: InValue[]): Promise<T[]>;
-    run(sql: string, args?: InValue[]): Promise<void>;
+    first<T>(sql: string, args?: unknown[]): Promise<T | null>;
+    all<T>(sql: string, args?: unknown[]): Promise<T[]>;
+    run(sql: string, args?: unknown[]): Promise<void>;
 }
 
 class D1Queryable implements Queryable {
     constructor(private readonly db: D1Database) { }
 
-    async first<T>(sql: string, args: InValue[] = []): Promise<T | null> {
+    async first<T>(sql: string, args: unknown[] = []): Promise<T | null> {
         const statement = this.db.prepare(sql).bind(...args);
         const row = await statement.first<T>();
         return row ?? null;
     }
 
-    async all<T>(sql: string, args: InValue[] = []): Promise<T[]> {
+    async all<T>(sql: string, args: unknown[] = []): Promise<T[]> {
         const statement = this.db.prepare(sql).bind(...args);
         const result = await statement.all<T>();
         return result.results;
     }
 
-    async run(sql: string, args: InValue[] = []): Promise<void> {
+    async run(sql: string, args: unknown[] = []): Promise<void> {
         const statement = this.db.prepare(sql).bind(...args);
         await statement.run();
-    }
-}
-
-class TursoQueryable implements Queryable {
-    constructor(private readonly client: Client) { }
-
-    async first<T>(sql: string, args: InValue[] = []): Promise<T | null> {
-        const result = await this.client.execute({ sql, args });
-        if (result.rows.length === 0) {
-            return null;
-        }
-        return result.rows[0] as T;
-    }
-
-    async all<T>(sql: string, args: InValue[] = []): Promise<T[]> {
-        const result = await this.client.execute({ sql, args });
-        return result.rows as T[];
-    }
-
-    async run(sql: string, args: InValue[] = []): Promise<void> {
-        await this.client.execute({ sql, args });
     }
 }
 
@@ -74,14 +58,22 @@ class CallsRepository implements DatabaseAdapter {
         );
     }
 
-    getUserBySessionTokenHash(tokenHash: string): Promise<{ id: number; email: string; } | null> {
-        return this.queryable.first<{ id: number; email: string; }>(
-            `SELECT u.id, u.email
+    getUserBySessionTokenHash(tokenHash: string): Promise<{ id: number; email: string; first_name: string; last_name: string; } | null> {
+        return this.queryable.first<{ id: number; email: string; first_name: string; last_name: string; }>(
+            `SELECT u.id, u.email, u.first_name, u.last_name
        FROM sessions s
        INNER JOIN users u ON u.id = s.user_id
        WHERE s.token_hash = ?
          AND datetime(s.expires_at) > datetime('now')`,
             [tokenHash],
+        );
+    }
+
+    createUser(email: string, firstName: string, lastName: string, passwordHash: string): Promise<void> {
+        return this.queryable.run(
+            `INSERT INTO users (email, first_name, last_name, password_hash)
+       VALUES (?, ?, ?, ?)`,
+            [email, firstName, lastName, passwordHash],
         );
     }
 
@@ -95,6 +87,36 @@ class CallsRepository implements DatabaseAdapter {
 
     deleteSession(tokenHash: string): Promise<void> {
         return this.queryable.run(`DELETE FROM sessions WHERE token_hash = ?`, [tokenHash]);
+    }
+
+    cleanupExpiredInvites(): Promise<void> {
+        return this.queryable.run(
+            `DELETE FROM signup_invites
+       WHERE datetime(expires_at) <= datetime('now')
+          OR used_at IS NOT NULL`,
+        );
+    }
+
+    async createSignupInvite(email: string, tokenHash: string, expiresAt: string): Promise<void> {
+        await this.queryable.run(`DELETE FROM signup_invites WHERE email = ?`, [email]);
+        await this.queryable.run(
+            `INSERT INTO signup_invites (email, token_hash, expires_at)
+       VALUES (?, ?, ?)`,
+            [email, tokenHash, expiresAt],
+        );
+    }
+
+    getSignupInviteByTokenHash(tokenHash: string): Promise<{ id: number; email: string; expires_at: string; used_at: string | null; } | null> {
+        return this.queryable.first<{ id: number; email: string; expires_at: string; used_at: string | null; }>(
+            `SELECT id, email, expires_at, used_at
+       FROM signup_invites
+       WHERE token_hash = ?`,
+            [tokenHash],
+        );
+    }
+
+    deleteSignupInviteById(id: number): Promise<void> {
+        return this.queryable.run(`DELETE FROM signup_invites WHERE id = ?`, [id]);
     }
 
     async getSecondsUntilNextCall(userId: number): Promise<number> {
@@ -190,17 +212,6 @@ class CallsRepository implements DatabaseAdapter {
 }
 
 function getQueryable(env: Env): Queryable {
-    if (env.APP_ENV === "production") {
-        if (!env.TURSO_DATABASE_URL || !env.TURSO_AUTH_TOKEN) {
-            throw new Error("Production requires TURSO_DATABASE_URL and TURSO_AUTH_TOKEN");
-        }
-        const client = createClient({
-            url: env.TURSO_DATABASE_URL,
-            authToken: env.TURSO_AUTH_TOKEN,
-        });
-        return new TursoQueryable(client);
-    }
-
     return new D1Queryable(env.DB);
 }
 

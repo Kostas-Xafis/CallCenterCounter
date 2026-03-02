@@ -1,9 +1,9 @@
+import { D1Database } from "@cloudflare/workers-types";
+
 export interface Env {
     APP_ENV: "development" | "production";
     SESSION_COOKIE_NAME?: string;
     AUTH_PEPPER?: string;
-    TURSO_DATABASE_URL?: string;
-    TURSO_AUTH_TOKEN?: string;
     DB: D1Database;
 }
 
