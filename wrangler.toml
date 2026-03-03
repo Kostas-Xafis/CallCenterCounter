@@ -1,9 +1,11 @@
 name = "call-center-counter"
-main = "dist/_worker.js"
+main = "dist/_worker.js/index.js"
 compatibility_date = "2026-03-02"
+compatibility_flags = ["nodejs_compat"]
 
 [assets]
 directory = "./dist"
+binding = "ASSETS"
 
 [vars]
 APP_ENV = "development"

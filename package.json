@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "preview": "astro build && wrangler dev ./dist/_worker.js",
-    "deploy": "astro build && wrangler deploy",
+    "preview": "astro build && wrangler dev ./dist/_worker.js/index.js",
+    "deploy": "astro build && echo '_worker.js\n_worker.js.map\n_routes.json' > dist/.assetsignore && wrangler deploy --env production",
     "typecheck": "astro check && tsc --noEmit",
     "db:delete:local": "wrangler d1 execute call_center_dev --local --file=./db/delete.sql",
     "db:migrate:local": "wrangler d1 execute call_center_dev --local --file=./db/schema.sql",
