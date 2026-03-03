@@ -37,7 +37,11 @@ const userDisplayName = `${user.first_name} ${user.last_name}`.trim() || user.em
     <div id="invite-error" class="error"></div>
     <label class="stack" for="invite-url">
       <span>Invite URL</span>
-      <input id="invite-url" type="text" readonly />
+      <div class="row" style="gap:8px; align-items:stretch;">
+        <input id="invite-url" type="text" readonly style="flex:1;" />
+        <button id="copy-invite-url" class="primary" type="button" disabled>Copy URL</button>
+      </div>
+      <div id="copy-status" class="muted" style="min-height:1em;"></div>
     </label>
   </div>
 
@@ -45,11 +49,29 @@ const userDisplayName = `${user.first_name} ${user.last_name}`.trim() || user.em
     const form = document.getElementById('invite-form');
     const errorEl = document.getElementById('invite-error');
     const inviteUrlInput = document.getElementById('invite-url');
+    const copyButton = document.getElementById('copy-invite-url');
+    const copyStatus = document.getElementById('copy-status');
+
+    async function copyTextToClipboard(text) {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+
+      inviteUrlInput.select();
+      inviteUrlInput.setSelectionRange(0, text.length);
+      const ok = document.execCommand('copy');
+      if (!ok) {
+        throw new Error('Copy failed');
+      }
+    }
 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       errorEl.textContent = '';
+      copyStatus.textContent = '';
       inviteUrlInput.value = '';
+      copyButton.disabled = true;
 
       const email = document.getElementById('invite-email').value.trim();
       const response = await fetch('/api/admin/invites', {
@@ -66,6 +88,24 @@ const userDisplayName = `${user.first_name} ${user.last_name}`.trim() || user.em
 
       const data = await response.json();
       inviteUrlInput.value = data.inviteUrl;
+      copyButton.disabled = false;
+    });
+
+    copyButton.addEventListener('click', async () => {
+      const url = inviteUrlInput.value.trim();
+      copyStatus.textContent = '';
+
+      if (!url) {
+        copyStatus.textContent = 'No invite URL to copy yet.';
+        return;
+      }
+
+      try {
+        await copyTextToClipboard(url);
+        copyStatus.textContent = 'Invite URL copied.';
+      } catch {
+        copyStatus.textContent = 'Could not copy automatically. Please copy manually.';
+      }
     });
   </script>
 </AuthLayout>

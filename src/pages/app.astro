@@ -40,7 +40,10 @@ const showInviteLink = isAdminEmail(user.email);
 
   <div class="card stack">
     <p class="muted">Click on every incoming call.</p>
-    <button id="increment" class="button-call"><i class="fa-solid fa-plus icon" aria-hidden="true"></i>Add incoming call</button>
+    <div class="row" style="justify-content:flex-start; gap:10px; flex-wrap:wrap;">
+      <button id="increment" class="button-call"><i class="fa-solid fa-plus icon" aria-hidden="true"></i>Add incoming call</button>
+      <button id="remove-last" class="primary" type="button"><i class="fa-solid fa-rotate-left icon" aria-hidden="true"></i>Remove last call</button>
+    </div>
     <div id="increment-error" class="error"></div>
   </div>
 
@@ -67,6 +70,19 @@ const showInviteLink = isAdminEmail(user.email);
 
       const data = await response.json().catch(() => ({}));
       incrementError.textContent = data.error || 'Unable to update call counter right now.';
+    });
+
+    document.getElementById('remove-last').addEventListener('click', async () => {
+      const incrementError = document.getElementById('increment-error');
+      incrementError.textContent = '';
+      const response = await fetch('/api/calls/remove-last', { method: 'POST' });
+      if (response.ok) {
+        refreshSummary();
+        return;
+      }
+
+      const data = await response.json().catch(() => ({}));
+      incrementError.textContent = data.error || 'Unable to remove the last call right now.';
     });
 
     refreshSummary();
