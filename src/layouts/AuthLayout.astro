@@ -1,0 +1,91 @@
+---
+import PageShell from "../components/PageShell.astro";
+
+type NavView = "app" | "invites" | "weekly" | "monthly" | "all-time" | "total";
+
+interface Props {
+  title: string;
+  active: NavView;
+  userName: string;
+  showInviteLink?: boolean;
+}
+
+const { title, active, userName, showInviteLink = false } = Astro.props;
+---
+
+<PageShell title={title}>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="brand"><i class="fa-solid fa-headset icon icon-primary" aria-hidden="true"></i>Call Center Counter</div>
+        <button id="menu-toggle" class="menu-toggle" aria-expanded="false" aria-controls="mobile-menu">
+          <i class="fa-solid fa-bars icon" aria-hidden="true"></i>Menu
+        </button>
+      </div>
+      <div id="mobile-menu" class="mobile-menu">
+        <div class="user-email" title={userName}>
+          <span class="user-email-icon"><i class="fa-solid fa-user icon-muted" aria-hidden="true"></i></span>
+          <span class="user-email-text">{userName}</span>
+        </div>
+        <nav class="nav nav-main">
+          <a class={active === "app" ? "active" : ""} href="/app"><i class="fa-solid fa-house icon" aria-hidden="true"></i>Counter</a>
+          {showInviteLink ? <a class={active === "invites" ? "active" : ""} href="/admin/invites"><i class="fa-solid fa-link icon" aria-hidden="true"></i>Invites</a> : null}
+          <a class={active === "weekly" ? "active" : ""} href="/stats/weekly"><i class="fa-solid fa-chart-line icon" aria-hidden="true"></i>Weekly</a>
+          <a class={active === "monthly" ? "active" : ""} href="/stats/monthly"><i class="fa-solid fa-calendar-days icon" aria-hidden="true"></i>Monthly</a>
+          <a class={active === "all-time" ? "active" : ""} href="/stats/all-time"><i class="fa-solid fa-trophy icon" aria-hidden="true"></i>All-Time</a>
+          <a class={active === "total" ? "active" : ""} href="/stats/total"><i class="fa-solid fa-globe icon" aria-hidden="true"></i>Total</a>
+        </nav>
+        <div class="sidebar-footer nav nav-footer">
+          <button id="logout"><i class="fa-solid fa-right-from-bracket icon" aria-hidden="true"></i>Logout</button>
+        </div>
+      </div>
+    </aside>
+    <main class="main">
+      <div class="container"><slot /></div>
+    </main>
+  </div>
+
+  <script is:inline>
+    const sidebarEl = document.querySelector('.sidebar');
+    const menuToggle = document.getElementById('menu-toggle');
+    const navLinks = document.querySelectorAll('.nav-main a');
+
+    if (menuToggle && sidebarEl) {
+      menuToggle.addEventListener('click', () => {
+        const isOpen = sidebarEl.classList.toggle('open');
+        menuToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      });
+
+      navLinks.forEach((link) => {
+        link.addEventListener('click', () => {
+          if (window.innerWidth <= 900) {
+            sidebarEl.classList.remove('open');
+            menuToggle.setAttribute('aria-expanded', 'false');
+          }
+        });
+      });
+
+      const media = window.matchMedia('(max-width: 900px)');
+      const syncMenuState = () => {
+        if (!media.matches) {
+          sidebarEl.classList.remove('open');
+          menuToggle.setAttribute('aria-expanded', 'false');
+        }
+      };
+      syncMenuState();
+      if (media.addEventListener) {
+        media.addEventListener('change', syncMenuState);
+      } else if (media.addListener) {
+        media.addListener(syncMenuState);
+      }
+    }
+
+    const logoutButton = document.getElementById('logout');
+    if (logoutButton) {
+      logoutButton.addEventListener('click', async () => {
+        await fetch('/api/logout', { method: 'POST' });
+        window.location.href = '/login';
+      });
+    }
+  </script>
+</PageShell>

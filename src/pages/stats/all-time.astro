@@ -1,0 +1,52 @@
+---
+import AuthLayout from "../../layouts/AuthLayout.astro";
+import type { Env } from "../../types";
+import { getCurrentUser, isAdminEmail } from "../../server/auth";
+
+export const prerender = false;
+
+const env = Astro.locals.runtime?.env as Env | undefined;
+if (!env) {
+  throw new Error("Cloudflare runtime env not available");
+}
+
+const user = await getCurrentUser(Astro.request, env);
+if (!user) {
+  return Astro.redirect("/login");
+}
+
+const userDisplayName = `${user.first_name} ${user.last_name}`.trim() || user.email;
+const showInviteLink = isAdminEmail(user.email);
+---
+
+<AuthLayout title="All-Time Stats" active="all-time" userName={userDisplayName} showInviteLink={showInviteLink}>
+  <div class="card stack">
+    <h1><i class="fa-solid fa-trophy icon icon-primary" aria-hidden="true"></i>All-Time Stats</h1>
+    <p class="muted">Your lifetime performance.</p>
+    <div id="allTimeStats" class="metrics-grid"></div>
+  </div>
+
+  <script is:inline>
+    async function loadStats() {
+      const response = await fetch('/api/stats?scope=user');
+      if (!response.ok) {
+        if (response.status === 401) window.location.href = '/login';
+        return null;
+      }
+      return response.json();
+    }
+
+    (async () => {
+      const data = await loadStats();
+      if (!data) return;
+      const stats = data.allTime;
+      const first = stats.first_call_at ? new Date(stats.first_call_at).toLocaleString() : 'N/A';
+      const last = stats.last_call_at ? new Date(stats.last_call_at).toLocaleString() : 'N/A';
+      document.getElementById('allTimeStats').innerHTML =
+        '<div class="metric-card"><div class="metric-label">Total calls</div><div class="metric-value">' + stats.total_calls + '</div></div>' +
+        '<div class="metric-card"><div class="metric-label">Active days</div><div class="metric-value">' + stats.active_days + '</div></div>' +
+        '<div class="metric-card"><div class="metric-label">First call</div><div class="metric-value">' + first + '</div></div>' +
+        '<div class="metric-card"><div class="metric-label">Last call</div><div class="metric-value">' + last + '</div></div>';
+    })();
+  </script>
+</AuthLayout>

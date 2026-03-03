@@ -1,0 +1,95 @@
+---
+import PageShell from "../../components/PageShell.astro";
+import type { Env } from "../../types";
+import { getValidInvite, normalizeEmail } from "../../server/auth";
+
+export const prerender = false;
+
+const env = Astro.locals.runtime?.env as Env | undefined;
+if (!env) {
+  throw new Error("Cloudflare runtime env not available");
+}
+
+const token = Astro.url.searchParams.get("token");
+const email = normalizeEmail(Astro.url.searchParams.get("email") || "");
+const invite = await getValidInvite(token, env);
+const invalidMessage = "This signup link is invalid or has expired.";
+const isValid = Boolean(invite && token && email && normalizeEmail(invite.email) === email);
+
+if (!isValid) {
+  Astro.response.status = 410;
+}
+---
+
+<PageShell title={isValid ? "Complete Signup" : "Invalid Invite"}>
+  {
+    !isValid ? (
+      <div style="max-width:460px; margin:64px auto; padding:0 16px;">
+        <div class="card stack">
+          <h1><i class="fa-solid fa-triangle-exclamation icon icon-error" aria-hidden="true"></i>Invite unavailable</h1>
+          <p class="muted">{invalidMessage}</p>
+          <a href="/login">Back to login</a>
+        </div>
+      </div>
+    ) : (
+      <div style="max-width:460px; margin:64px auto; padding:0 16px;">
+        <div class="card stack">
+          <h1><i class="fa-solid fa-user-plus icon icon-primary" aria-hidden="true"></i>Complete your signup</h1>
+          <p class="muted">Finish setting up your account.</p>
+          <form id="signup-form" class="stack">
+            <label class="stack">
+              <span><i class="fa-solid fa-envelope icon icon-primary" aria-hidden="true"></i>Email</span>
+              <input id="email" type="email" value={invite?.email} readonly />
+            </label>
+            <label class="stack">
+              <span><i class="fa-solid fa-user icon icon-primary" aria-hidden="true"></i>First name</span>
+              <input id="first-name" type="text" required />
+            </label>
+            <label class="stack">
+              <span><i class="fa-solid fa-user icon icon-primary" aria-hidden="true"></i>Last name</span>
+              <input id="last-name" type="text" required />
+            </label>
+            <label class="stack">
+              <span><i class="fa-solid fa-key icon icon-primary" aria-hidden="true"></i>Password</span>
+              <input id="password" type="password" minlength="8" required />
+            </label>
+            <button class="primary" type="submit">Create account</button>
+            <div id="error" class="error"></div>
+          </form>
+        </div>
+      </div>
+    )
+  }
+
+  {
+    isValid && token ? (
+      <script is:inline define:vars={{ token }}>
+        const form = document.getElementById('signup-form');
+        const error = document.getElementById('error');
+
+        form.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          error.textContent = '';
+
+          const firstName = document.getElementById('first-name').value.trim();
+          const lastName = document.getElementById('last-name').value.trim();
+          const password = document.getElementById('password').value;
+
+          const response = await fetch('/api/signup/complete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token, firstName, lastName, password })
+          });
+
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            error.textContent = data.error || 'Could not create account.';
+            return;
+          }
+
+          window.location.href = '/login';
+        });
+      </script>
+    ) : null
+  }
+</PageShell>

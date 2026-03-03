@@ -1,22 +1,10 @@
 import { getRepository } from "./db";
-import {
-    appPage,
-    inviteGeneratorPage,
-    inviteInvalidPage,
-    inviteSignupPage,
-    inviteVerifyEmailPage,
-    loginPage,
-    statsAllTimePage,
-    statsMonthlyPage,
-    statsTotalPage,
-    statsWeeklyPage,
-} from "./pages";
+import { getCurrentUser, getCookieName, getValidInvite, isAdminEmail, normalizeEmail, parseCookies } from "./server/auth";
 import { hashPassword, randomToken, sha256Hex } from "./security";
 import type { Env } from "./types";
 
 const SESSION_DAYS = 30;
 const SIGNUP_INVITE_DAYS = 5;
-const ADMIN_EMAIL = "koxafis@gmail.com";
 const CALL_WINDOW_START_MINUTES = 7 * 60;
 const CALL_WINDOW_END_MINUTES = 14 * 60 + 30;
 const CALL_CENTER_UTC_OFFSET_MINUTES = 2 * 60;
@@ -33,35 +21,6 @@ function redirect(location: string): Response {
         status: 302,
         headers: { Location: location },
     });
-}
-
-function html(content: string, status = 200): Response {
-    return new Response(content, {
-        status,
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-    });
-}
-
-function parseCookies(request: Request): Record<string, string> {
-    const header = request.headers.get("cookie");
-    if (!header) {
-        return {};
-    }
-
-    return Object.fromEntries(
-        header
-            .split(";")
-            .map((cookie) => cookie.trim())
-            .filter(Boolean)
-            .map((cookie) => {
-                const [key, ...valueParts] = cookie.split("=");
-                return [key, decodeURIComponent(valueParts.join("="))];
-            }),
-    );
-}
-
-function getCookieName(env: Env): string {
-    return env.SESSION_COOKIE_NAME || "cc_session";
 }
 
 function setSessionCookie(token: string, env: Env): string {
@@ -86,51 +45,8 @@ function isWithinCallCenterHours(now: Date): boolean {
     return localMinutes >= CALL_WINDOW_START_MINUTES && localMinutes <= CALL_WINDOW_END_MINUTES;
 }
 
-async function getCurrentUser(request: Request, env: Env): Promise<{ id: number; email: string; first_name: string; last_name: string; } | null> {
-    const cookies = parseCookies(request);
-    const token = cookies[getCookieName(env)];
-    if (!token) {
-        return null;
-    }
-
-    const tokenHash = await sha256Hex(token);
-    const repo = getRepository(env);
-    return repo.getUserBySessionTokenHash(tokenHash);
-}
-
-function normalizeEmail(value: string): string {
-    return value.trim().toLowerCase();
-}
-
-function isAdminEmail(email: string): boolean {
-    return normalizeEmail(email) === ADMIN_EMAIL;
-}
-
 function isValidSignupInvitePayload(firstName?: string, lastName?: string, password?: string): boolean {
     return Boolean(firstName?.trim() && lastName?.trim() && password && password.length >= 8);
-}
-
-async function getValidInvite(rawToken: string | null, env: Env): Promise<{ id: number; email: string; } | null> {
-    if (!rawToken) {
-        return null;
-    }
-
-    const repo = getRepository(env);
-    await repo.cleanupExpiredInvites();
-
-    const tokenHash = await sha256Hex(rawToken);
-    const invite = await repo.getSignupInviteByTokenHash(tokenHash);
-
-    if (!invite) {
-        return null;
-    }
-
-    if (invite.used_at || new Date(invite.expires_at).getTime() <= Date.now()) {
-        await repo.deleteSignupInviteById(invite.id);
-        return null;
-    }
-
-    return { id: invite.id, email: invite.email };
 }
 
 async function handleLogin(request: Request, env: Env): Promise<Response> {
@@ -195,16 +111,7 @@ export default {
         const method = request.method;
 
         if (path === "/" && method === "GET") {
-            const user = await getCurrentUser(request, env);
-            return user ? redirect("/app") : redirect("/login");
-        }
-
-        if (path === "/login" && method === "GET") {
-            const user = await getCurrentUser(request, env);
-            if (user) {
-                return redirect("/app");
-            }
-            return html(loginPage());
+            return redirect("/login");
         }
 
         if (path === "/api/login" && method === "POST") {
@@ -213,29 +120,6 @@ export default {
 
         if (path === "/api/logout" && method === "POST") {
             return handleLogout(request, env);
-        }
-
-        if (path === "/signup/verify" && method === "GET") {
-            const token = url.searchParams.get("token");
-            const invite = await getValidInvite(token, env);
-
-            if (!invite || !token) {
-                return html(inviteInvalidPage("This signup link is invalid or has expired."), 410);
-            }
-
-            return html(inviteVerifyEmailPage(token));
-        }
-
-        if (path === "/signup/register" && method === "GET") {
-            const token = url.searchParams.get("token");
-            const email = normalizeEmail(url.searchParams.get("email") || "");
-            const invite = await getValidInvite(token, env);
-
-            if (!invite || !token || !email || normalizeEmail(invite.email) !== email) {
-                return html(inviteInvalidPage("This signup link is invalid or has expired."), 410);
-            }
-
-            return html(inviteSignupPage(token, invite.email));
         }
 
         if (path === "/api/signup/verify-invite" && method === "POST") {
@@ -306,15 +190,7 @@ export default {
         }
 
         const repo = getRepository(env);
-        const userDisplayName = `${user.first_name} ${user.last_name}`.trim() || user.email;
         const isAdminUser = isAdminEmail(user.email);
-
-        if (path === "/admin/invites" && method === "GET") {
-            if (!isAdminUser) {
-                return new Response("Forbidden", { status: 403 });
-            }
-            return html(inviteGeneratorPage(userDisplayName, isAdminUser));
-        }
 
         if (path === "/api/admin/invites" && method === "POST") {
             if (!isAdminUser) {
@@ -345,30 +221,6 @@ export default {
                 inviteUrl: `${url.origin}/signup/verify?token=${encodeURIComponent(rawToken)}`,
                 expiresAt,
             });
-        }
-
-        if (path === "/app" && method === "GET") {
-            return html(appPage(userDisplayName, isAdminUser));
-        }
-
-        if (path === "/stats" && method === "GET") {
-            return redirect("/stats/weekly");
-        }
-
-        if (path === "/stats/weekly" && method === "GET") {
-            return html(statsWeeklyPage(userDisplayName, isAdminUser));
-        }
-
-        if (path === "/stats/monthly" && method === "GET") {
-            return html(statsMonthlyPage(userDisplayName, isAdminUser));
-        }
-
-        if (path === "/stats/all-time" && method === "GET") {
-            return html(statsAllTimePage(userDisplayName, isAdminUser));
-        }
-
-        if (path === "/stats/total" && method === "GET") {
-            return html(statsTotalPage(userDisplayName, isAdminUser));
         }
 
         if (path === "/api/me" && method === "GET") {

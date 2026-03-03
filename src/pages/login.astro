@@ -1,0 +1,64 @@
+---
+import PageShell from "../components/PageShell.astro";
+import type { Env } from "../types";
+import { getCurrentUser } from "../server/auth";
+
+export const prerender = false;
+
+const env = Astro.locals.runtime?.env as Env | undefined;
+if (!env) {
+  throw new Error("Cloudflare runtime env not available");
+}
+
+const user = await getCurrentUser(Astro.request, env);
+if (user) {
+  return Astro.redirect("/app");
+}
+---
+
+<PageShell title="Login">
+  <div style="max-width:460px; margin:64px auto; padding:0 16px;">
+    <div class="card stack">
+      <h1><i class="fa-solid fa-lock icon icon-primary" aria-hidden="true"></i>Call Center Counter</h1>
+      <p class="muted">Sign in to start counting incoming calls.</p>
+      <form id="login-form" class="stack">
+        <label class="stack">
+          <span><i class="fa-solid fa-envelope icon icon-primary" aria-hidden="true"></i>Email</span>
+          <input id="email" type="email" required />
+        </label>
+        <label class="stack">
+          <span><i class="fa-solid fa-key icon icon-primary" aria-hidden="true"></i>Password</span>
+          <input id="password" type="password" required />
+        </label>
+        <button class="primary" type="submit"><i class="fa-solid fa-right-to-bracket icon" aria-hidden="true"></i>Sign in</button>
+        <div id="error" class="error"></div>
+      </form>
+    </div>
+  </div>
+
+  <script is:inline>
+    const form = document.getElementById('login-form');
+    const error = document.getElementById('error');
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      error.textContent = '';
+
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        error.textContent = data.error || 'Invalid credentials';
+        return;
+      }
+
+      window.location.href = '/app';
+    });
+  </script>
+</PageShell>

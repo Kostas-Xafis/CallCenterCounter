@@ -1,0 +1,144 @@
+---
+import AuthLayout from "../../layouts/AuthLayout.astro";
+import type { Env } from "../../types";
+import { getCurrentUser, isAdminEmail } from "../../server/auth";
+
+export const prerender = false;
+
+const env = Astro.locals.runtime?.env as Env | undefined;
+if (!env) {
+  throw new Error("Cloudflare runtime env not available");
+}
+
+const user = await getCurrentUser(Astro.request, env);
+if (!user) {
+  return Astro.redirect("/login");
+}
+
+const userDisplayName = `${user.first_name} ${user.last_name}`.trim() || user.email;
+const showInviteLink = isAdminEmail(user.email);
+---
+
+<AuthLayout title="Total Stats" active="total" userName={userDisplayName} showInviteLink={showInviteLink}>
+  <div class="card stack">
+    <h1><i class="fa-solid fa-globe icon icon-primary" aria-hidden="true"></i>Total Stats</h1>
+    <p class="muted">Combined stats from all users.</p>
+  </div>
+
+  <div class="card stack">
+    <h2><i class="fa-solid fa-chart-line icon icon-chart" aria-hidden="true"></i>Daily total (last 7 days)</h2>
+    <div class="chart-container">
+      <canvas id="totalDailyChart" class="chart-canvas"></canvas>
+    </div>
+  </div>
+
+  <div class="card stack">
+    <h2><i class="fa-solid fa-calendar-days icon icon-primary" aria-hidden="true"></i>Weekly total (last month)</h2>
+    <div class="chart-container">
+      <canvas id="totalWeeklyChart" class="chart-canvas"></canvas>
+    </div>
+  </div>
+
+  <div class="card stack">
+    <h2><i class="fa-solid fa-flag-checkered icon icon-primary" aria-hidden="true"></i>Total all-time</h2>
+    <div id="totalAllTime" class="metrics-grid"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script is:inline>
+    async function loadStats() {
+      const response = await fetch('/api/stats?scope=total');
+      if (!response.ok) {
+        if (response.status === 401) window.location.href = '/login';
+        return null;
+      }
+      return response.json();
+    }
+
+    function renderLineChart(canvasId, labels, values, label) {
+      const isMobile = window.matchMedia('(max-width: 640px)').matches;
+      const theme = getComputedStyle(document.documentElement);
+      const lineColor = theme.getPropertyValue('--chart-line').trim() || '#60a5fa';
+      const gridColor = theme.getPropertyValue('--chart-grid').trim() || '#e2e8f0';
+      const textColor = theme.getPropertyValue('--chart-text').trim() || '#4a5568';
+      const ctx = document.getElementById(canvasId).getContext('2d');
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label,
+            data: values,
+            tension: 0.25,
+            fill: false,
+            borderColor: lineColor,
+            backgroundColor: lineColor,
+            pointBackgroundColor: lineColor,
+            pointBorderColor: lineColor
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              labels: {
+                color: textColor,
+                boxWidth: isMobile ? 10 : 14,
+                font: { size: isMobile ? 11 : 12 }
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: {
+                color: textColor,
+                autoSkip: true,
+                maxTicksLimit: isMobile ? 4 : 8,
+                maxRotation: isMobile ? 0 : 35,
+                font: { size: isMobile ? 10 : 12 }
+              },
+              grid: { color: gridColor }
+            },
+            y: {
+              beginAtZero: true,
+              ticks: {
+                color: textColor,
+                maxTicksLimit: isMobile ? 5 : 8,
+                font: { size: isMobile ? 10 : 12 }
+              },
+              grid: { color: gridColor }
+            }
+          }
+        }
+      });
+    }
+
+    (async () => {
+      const data = await loadStats();
+      if (!data) return;
+
+      renderLineChart(
+        'totalDailyChart',
+        data.daily.map(d => d.period),
+        data.daily.map(d => d.count),
+        'Total daily calls'
+      );
+
+      renderLineChart(
+        'totalWeeklyChart',
+        data.weekly.map(w => w.year_week),
+        data.weekly.map(w => w.count),
+        'Total weekly calls'
+      );
+
+      const first = data.allTime.first_call_at ? new Date(data.allTime.first_call_at).toLocaleString() : 'N/A';
+      const last = data.allTime.last_call_at ? new Date(data.allTime.last_call_at).toLocaleString() : 'N/A';
+      document.getElementById('totalAllTime').innerHTML =
+        '<div class="metric-card"><div class="metric-label">Total calls</div><div class="metric-value">' + data.allTime.total_calls + '</div></div>' +
+        '<div class="metric-card"><div class="metric-label">Active days</div><div class="metric-value">' + data.allTime.active_days + '</div></div>' +
+        '<div class="metric-card"><div class="metric-label">First call</div><div class="metric-value">' + first + '</div></div>' +
+        '<div class="metric-card"><div class="metric-label">Last call</div><div class="metric-value">' + last + '</div></div>';
+    })();
+  </script>
+</AuthLayout>

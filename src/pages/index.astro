@@ -1,0 +1,14 @@
+---
+import type { Env } from "../types";
+import { getCurrentUser } from "../server/auth";
+
+export const prerender = false;
+
+const env = Astro.locals.runtime?.env as Env | undefined;
+if (!env) {
+  throw new Error("Cloudflare runtime env not available");
+}
+
+const user = await getCurrentUser(Astro.request, env);
+return Astro.redirect(user ? "/app" : "/login");
+---

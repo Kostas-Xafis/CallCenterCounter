@@ -1,0 +1,424 @@
+---
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+    <style is:global>
+      :root {
+        color-scheme: light dark;
+        --bg: #f7fafc;
+        --text: #1a202c;
+        --muted: #4a5568;
+        --card: #ffffff;
+        --card-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+        --sidebar-bg: #1f2937;
+        --sidebar-text: #e5e7eb;
+        --sidebar-muted: #9ca3af;
+        --sidebar-link: #d1d5db;
+        --sidebar-link-active-bg: #374151;
+        --sidebar-link-active-text: #ffffff;
+        --input-bg: #ffffff;
+        --input-border: #cbd5e0;
+        --input-text: #1a202c;
+        --primary-bg: #2b6cb0;
+        --primary-text: #ffffff;
+        --call-btn-bg: #b45309;
+        --call-btn-hover-bg: #92400e;
+        --call-btn-text: #ffffff;
+        --error: #c53030;
+        --chart-line: #60a5fa;
+        --chart-grid: #e2e8f0;
+        --chart-text: #4a5568;
+        --metric-bg: #f8fafc;
+        --metric-border: #e2e8f0;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0f172a;
+          --text: #e2e8f0;
+          --muted: #94a3b8;
+          --card: #111827;
+          --card-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+          --sidebar-bg: #020617;
+          --sidebar-text: #e2e8f0;
+          --sidebar-muted: #94a3b8;
+          --sidebar-link: #cbd5e1;
+          --sidebar-link-active-bg: #1e293b;
+          --sidebar-link-active-text: #f8fafc;
+          --input-bg: #0b1220;
+          --input-border: #334155;
+          --input-text: #e2e8f0;
+          --primary-bg: #2563eb;
+          --primary-text: #f8fafc;
+          --call-btn-bg: #f59e0b;
+          --call-btn-hover-bg: #fbbf24;
+          --call-btn-text: #0f172a;
+          --error: #f87171;
+          --chart-line: #60a5fa;
+          --chart-grid: #334155;
+          --chart-text: #94a3b8;
+          --metric-bg: #1e293b;
+          --metric-border: #334155;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        font-family: Inter, system-ui, sans-serif;
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+      }
+      .layout {
+        display: flex;
+        height: 100dvh;
+        overflow: hidden;
+      }
+      .sidebar {
+        width: 260px;
+        height: 100dvh;
+        background: var(--sidebar-bg);
+        color: var(--sidebar-text);
+        padding: 20px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        overflow-y: auto;
+      }
+      .sidebar-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .brand {
+        font-weight: 700;
+        font-size: 18px;
+        padding: 10px 12px;
+      }
+      .menu-toggle {
+        display: none;
+        border: 1px solid var(--sidebar-link-active-bg);
+        background: transparent;
+        color: var(--sidebar-link-active-text);
+        border-radius: 8px;
+        padding: 8px 10px;
+        min-height: 40px;
+        font-size: 14px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .mobile-menu {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        flex: 1 1 auto;
+        min-height: 0;
+      }
+      .user-email {
+        padding: 0 12px;
+        color: var(--sidebar-muted);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+      }
+      .user-email-icon {
+        flex: 0 0 auto;
+      }
+      .user-email-text {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .nav {
+        display: grid;
+        gap: 8px;
+      }
+      .nav a,
+      .nav button {
+        width: 100%;
+        text-align: left;
+        border: 0;
+        background: transparent;
+        color: var(--sidebar-link);
+        text-decoration: none;
+        border-radius: 8px;
+        padding: 10px 12px;
+        cursor: pointer;
+        font-size: 14px;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+      }
+      .nav a.active {
+        background: var(--sidebar-link-active-bg);
+        color: var(--sidebar-link-active-text);
+      }
+      .nav a:hover,
+      .nav button:hover {
+        background: var(--sidebar-link-active-bg);
+        color: var(--sidebar-link-active-text);
+      }
+      .sidebar-footer {
+        margin-top: auto;
+      }
+      .main {
+        flex: 1;
+        height: 100dvh;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: 24px;
+      }
+      .container {
+        max-width: 980px;
+        margin: 0 auto;
+        display: grid;
+        gap: 14px;
+      }
+      .card {
+        background: var(--card);
+        border-radius: 12px;
+        box-shadow: var(--card-shadow);
+        padding: 20px;
+      }
+      .row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .stack {
+        display: grid;
+        gap: 12px;
+      }
+      .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .stat {
+        font-size: 30px;
+        font-weight: 700;
+      }
+      .error {
+        color: var(--error);
+        min-height: 1em;
+      }
+      .metrics-grid {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .metric-card {
+        background: var(--metric-bg);
+        border: 1px solid var(--metric-border);
+        border-radius: 10px;
+        padding: 12px;
+      }
+      .metric-label {
+        color: var(--muted);
+        font-size: 12px;
+        margin-bottom: 6px;
+      }
+      .metric-value {
+        font-weight: 700;
+        font-size: 18px;
+        word-break: break-word;
+      }
+      .icon {
+        margin-right: 8px;
+      }
+      .icon-muted {
+        color: var(--sidebar-muted);
+      }
+      .icon-primary {
+        color: var(--primary-bg);
+      }
+      .icon-call {
+        color: var(--call-btn-bg);
+      }
+      .icon-chart {
+        color: var(--chart-line);
+      }
+      .icon-error {
+        color: var(--error);
+      }
+      h1,
+      h2 {
+        margin: 0;
+      }
+      input {
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--input-border);
+        width: 100%;
+        background: var(--input-bg);
+        color: var(--input-text);
+      }
+      button.primary {
+        border: 0;
+        border-radius: 8px;
+        padding: 10px 14px;
+        cursor: pointer;
+        font-weight: 600;
+        background: var(--primary-bg);
+        color: var(--primary-text);
+      }
+      .button-call {
+        border: 0;
+        border-radius: 8px;
+        padding: 10px 14px;
+        cursor: pointer;
+        font-weight: 700;
+        background: var(--call-btn-bg);
+        color: var(--call-btn-text);
+      }
+      .button-call:hover {
+        background: var(--call-btn-hover-bg);
+      }
+      .chart-container {
+        position: relative;
+        width: 100%;
+        height: 280px;
+      }
+      .chart-canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      @media (max-width: 900px) {
+        .layout {
+          flex-direction: column;
+          height: auto;
+          min-height: 100dvh;
+          overflow: visible;
+        }
+        .sidebar {
+          width: 100%;
+          height: auto;
+          overflow: visible;
+          position: sticky;
+          top: 0;
+          z-index: 20;
+          padding: 10px;
+          gap: 8px;
+        }
+        .sidebar-header {
+          padding: 2px 4px;
+        }
+        .brand {
+          font-size: 16px;
+          padding: 6px 4px;
+        }
+        .menu-toggle {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .mobile-menu {
+          display: none;
+          gap: 8px;
+        }
+        .sidebar.open .mobile-menu {
+          display: flex;
+        }
+        .user-email {
+          padding: 0 8px;
+        }
+        .nav-main {
+          display: grid;
+          gap: 6px;
+        }
+        .nav-main a {
+          width: 100%;
+          white-space: normal;
+          padding: 8px 10px;
+          min-height: 40px;
+        }
+        .sidebar-footer {
+          margin-top: 0;
+        }
+        .sidebar-footer button {
+          width: 100%;
+          white-space: normal;
+          padding: 8px 10px;
+          min-height: 40px;
+        }
+        .main {
+          height: auto;
+          overflow: visible;
+          padding: 12px;
+        }
+        .container {
+          gap: 10px;
+        }
+        .card {
+          padding: 14px;
+          border-radius: 10px;
+        }
+        .row {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        h1 {
+          font-size: 22px;
+        }
+        h2 {
+          font-size: 18px;
+        }
+        .stat {
+          font-size: 26px;
+        }
+        .button-call,
+        button.primary {
+          width: 100%;
+          justify-content: center;
+        }
+        .chart-container {
+          height: 220px;
+        }
+      }
+      @media (max-width: 640px) {
+        .grid-2 {
+          grid-template-columns: 1fr;
+        }
+        .metrics-grid {
+          grid-template-columns: 1fr;
+        }
+        .brand {
+          font-size: 15px;
+        }
+        .user-email {
+          font-size: 13px;
+        }
+        .metric-value {
+          font-size: 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

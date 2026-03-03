@@ -1,0 +1,110 @@
+---
+import AuthLayout from "../../layouts/AuthLayout.astro";
+import type { Env } from "../../types";
+import { getCurrentUser, isAdminEmail } from "../../server/auth";
+
+export const prerender = false;
+
+const env = Astro.locals.runtime?.env as Env | undefined;
+if (!env) {
+  throw new Error("Cloudflare runtime env not available");
+}
+
+const user = await getCurrentUser(Astro.request, env);
+if (!user) {
+  return Astro.redirect("/login");
+}
+
+const userDisplayName = `${user.first_name} ${user.last_name}`.trim() || user.email;
+const showInviteLink = isAdminEmail(user.email);
+---
+
+<AuthLayout title="Weekly Stats" active="weekly" userName={userDisplayName} showInviteLink={showInviteLink}>
+  <div class="card stack">
+    <h1><i class="fa-solid fa-chart-line icon icon-chart" aria-hidden="true"></i>Weekly Stats</h1>
+    <p class="muted">Your calls per day in the last 7 days.</p>
+    <div class="chart-container">
+      <canvas id="weeklyChart" class="chart-canvas"></canvas>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script is:inline>
+    async function loadStats() {
+      const response = await fetch('/api/stats?scope=user');
+      if (!response.ok) {
+        if (response.status === 401) window.location.href = '/login';
+        return null;
+      }
+      return response.json();
+    }
+
+    function renderLineChart(canvasId, labels, values, datasetLabel) {
+      const isMobile = window.matchMedia('(max-width: 640px)').matches;
+      const theme = getComputedStyle(document.documentElement);
+      const lineColor = theme.getPropertyValue('--chart-line').trim() || '#60a5fa';
+      const gridColor = theme.getPropertyValue('--chart-grid').trim() || '#e2e8f0';
+      const textColor = theme.getPropertyValue('--chart-text').trim() || '#4a5568';
+      const ctx = document.getElementById(canvasId).getContext('2d');
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: datasetLabel,
+            data: values,
+            tension: 0.25,
+            fill: false,
+            borderColor: lineColor,
+            backgroundColor: lineColor,
+            pointBackgroundColor: lineColor,
+            pointBorderColor: lineColor
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              labels: {
+                color: textColor,
+                boxWidth: isMobile ? 10 : 14,
+                font: { size: isMobile ? 11 : 12 }
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: {
+                color: textColor,
+                autoSkip: true,
+                maxTicksLimit: isMobile ? 4 : 8,
+                maxRotation: isMobile ? 0 : 35,
+                font: { size: isMobile ? 10 : 12 }
+              },
+              grid: { color: gridColor }
+            },
+            y: {
+              beginAtZero: true,
+              ticks: {
+                color: textColor,
+                maxTicksLimit: isMobile ? 5 : 8,
+                font: { size: isMobile ? 10 : 12 }
+              },
+              grid: { color: gridColor }
+            }
+          }
+        }
+      });
+    }
+
+    (async () => {
+      const data = await loadStats();
+      if (!data) return;
+      const points = data.daily;
+      const labels = points.map(item => item.period);
+      const values = points.map(item => item.count);
+      renderLineChart('weeklyChart', labels, values, 'User calls (last 7 days)');
+    })();
+  </script>
+</AuthLayout>

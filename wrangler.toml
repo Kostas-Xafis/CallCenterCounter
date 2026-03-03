@@ -1,6 +1,9 @@
 name = "call-center-counter"
-main = "src/index.ts"
+main = "dist/_worker.js"
 compatibility_date = "2026-03-02"
+
+[assets]
+directory = "./dist"
 
 [vars]
 APP_ENV = "development"

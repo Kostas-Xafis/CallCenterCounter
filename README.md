@@ -1,4 +1,4 @@
-# Call Center Counter (Cloudflare Workers)
+# Call Center Counter (Astro + Cloudflare Workers)
 
 A Cloudflare Workers website for call center agents to:
 
@@ -9,6 +9,8 @@ A Cloudflare Workers website for call center agents to:
 
 ## Architecture
 
+- **UI Framework**: Astro
+- **Adapter**: `@astrojs/cloudflare`
 - **Runtime**: Cloudflare Workers
 - **Development DB**: Cloudflare D1 (SQLite)
 - **Production DB**: Cloudflare D1
@@ -40,10 +42,16 @@ Run local DB migration (D1 local/SQLite):
 npm run db:migrate:local
 ```
 
-Run locally:
+Run locally (Astro dev server with Cloudflare platform bindings):
 
 ```bash
 npm run dev
+```
+
+Build for Cloudflare Workers:
+
+```bash
+npm run build
 ```
 
 ## Environment values

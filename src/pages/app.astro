@@ -1,0 +1,74 @@
+---
+import AuthLayout from "../layouts/AuthLayout.astro";
+import type { Env } from "../types";
+import { getCurrentUser, isAdminEmail } from "../server/auth";
+
+export const prerender = false;
+
+const env = Astro.locals.runtime?.env as Env | undefined;
+if (!env) {
+  throw new Error("Cloudflare runtime env not available");
+}
+
+const user = await getCurrentUser(Astro.request, env);
+if (!user) {
+  return Astro.redirect("/login");
+}
+
+const userDisplayName = `${user.first_name} ${user.last_name}`.trim() || user.email;
+const showInviteLink = isAdminEmail(user.email);
+---
+
+<AuthLayout title="Call Counter" active="app" userName={userDisplayName} showInviteLink={showInviteLink}>
+  <div class="card row">
+    <div>
+      <h1><i class="fa-solid fa-house icon icon-primary" aria-hidden="true"></i>Main Counter</h1>
+      <p class="muted">Track every incoming call with one click.</p>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card stack">
+      <h2><i class="fa-solid fa-calendar-day icon icon-primary" aria-hidden="true"></i>Today</h2>
+      <div class="stat" id="today-calls">0</div>
+    </div>
+    <div class="card stack">
+      <h2><i class="fa-solid fa-chart-column icon icon-chart" aria-hidden="true"></i>All time</h2>
+      <div class="stat" id="total-calls">0</div>
+    </div>
+  </div>
+
+  <div class="card stack">
+    <p class="muted">Click on every incoming call.</p>
+    <button id="increment" class="button-call"><i class="fa-solid fa-plus icon" aria-hidden="true"></i>Add incoming call</button>
+    <div id="increment-error" class="error"></div>
+  </div>
+
+  <script is:inline>
+    async function refreshSummary() {
+      const response = await fetch('/api/me');
+      if (!response.ok) {
+        window.location.href = '/login';
+        return;
+      }
+      const data = await response.json();
+      document.getElementById('today-calls').textContent = data.summary.todayCalls;
+      document.getElementById('total-calls').textContent = data.summary.totalCalls;
+    }
+
+    document.getElementById('increment').addEventListener('click', async () => {
+      const incrementError = document.getElementById('increment-error');
+      incrementError.textContent = '';
+      const response = await fetch('/api/calls/increment', { method: 'POST' });
+      if (response.ok) {
+        refreshSummary();
+        return;
+      }
+
+      const data = await response.json().catch(() => ({}));
+      incrementError.textContent = data.error || 'Unable to update call counter right now.';
+    });
+
+    refreshSummary();
+  </script>
+</AuthLayout>

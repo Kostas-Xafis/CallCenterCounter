@@ -1,0 +1,71 @@
+---
+import AuthLayout from "../../layouts/AuthLayout.astro";
+import type { Env } from "../../types";
+import { getCurrentUser, isAdminEmail } from "../../server/auth";
+
+export const prerender = false;
+
+const env = Astro.locals.runtime?.env as Env | undefined;
+if (!env) {
+  throw new Error("Cloudflare runtime env not available");
+}
+
+const user = await getCurrentUser(Astro.request, env);
+if (!user) {
+  return Astro.redirect("/login");
+}
+
+const isAdminUser = isAdminEmail(user.email);
+if (!isAdminUser) {
+  return new Response("Forbidden", { status: 403 });
+}
+
+const userDisplayName = `${user.first_name} ${user.last_name}`.trim() || user.email;
+---
+
+<AuthLayout title="Invite Signup" active="invites" userName={userDisplayName} showInviteLink={true}>
+  <div class="card stack">
+    <h1><i class="fa-solid fa-link icon icon-primary" aria-hidden="true"></i>Create signup link</h1>
+    <p class="muted">Generate a 5-day invite URL for one email.</p>
+    <form id="invite-form" class="stack" style="max-width:520px;">
+      <label class="stack">
+        <span><i class="fa-solid fa-envelope icon icon-primary" aria-hidden="true"></i>Email</span>
+        <input id="invite-email" type="email" required />
+      </label>
+      <button class="primary" type="submit">Generate link</button>
+    </form>
+    <div id="invite-error" class="error"></div>
+    <label class="stack" for="invite-url">
+      <span>Invite URL</span>
+      <input id="invite-url" type="text" readonly />
+    </label>
+  </div>
+
+  <script is:inline>
+    const form = document.getElementById('invite-form');
+    const errorEl = document.getElementById('invite-error');
+    const inviteUrlInput = document.getElementById('invite-url');
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      errorEl.textContent = '';
+      inviteUrlInput.value = '';
+
+      const email = document.getElementById('invite-email').value.trim();
+      const response = await fetch('/api/admin/invites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        errorEl.textContent = data.error || 'Could not create invite link.';
+        return;
+      }
+
+      const data = await response.json();
+      inviteUrlInput.value = data.inviteUrl;
+    });
+  </script>
+</AuthLayout>
