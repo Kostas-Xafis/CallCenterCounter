@@ -13,6 +13,7 @@ interface DatabaseAdapter {
     deleteSignupInviteById(id: number): Promise<void>;
     getSecondsUntilNextCall(userId: number): Promise<number>;
     insertCall(userId: number): Promise<void>;
+    deleteLastCall(userId: number): Promise<boolean>;
     getUserSummary(userId: number): Promise<{ todayCalls: number; totalCalls: number; }>;
     getDailyStats(scope: "user" | "total", userId: number): Promise<DailyPoint[]>;
     getWeeklyStats(scope: "user" | "total", userId: number): Promise<WeeklyPoint[]>;
@@ -137,6 +138,24 @@ class CallsRepository implements DatabaseAdapter {
 
     insertCall(userId: number): Promise<void> {
         return this.queryable.run(`INSERT INTO calls (user_id) VALUES (?)`, [userId]);
+    }
+
+    async deleteLastCall(userId: number): Promise<boolean> {
+        const lastCall = await this.queryable.first<{ id: number; }>(
+            `SELECT id
+       FROM calls
+       WHERE user_id = ?
+       ORDER BY datetime(created_at) DESC, id DESC
+       LIMIT 1`,
+            [userId],
+        );
+
+        if (!lastCall) {
+            return false;
+        }
+
+        await this.queryable.run(`DELETE FROM calls WHERE id = ?`, [lastCall.id]);
+        return true;
     }
 
     async getUserSummary(userId: number): Promise<{ todayCalls: number; totalCalls: number; }> {

@@ -39,7 +39,10 @@ function addDays(date: Date, days: number): Date {
     return next;
 }
 
-function isWithinCallCenterHours(now: Date): boolean {
+function isWithinCallCenterHours(now: Date, env: "development" | "production" = "development"): boolean {
+    if (env === "development") {
+        return true;
+    }
     const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
     const localMinutes = (utcMinutes + CALL_CENTER_UTC_OFFSET_MINUTES + 24 * 60) % (24 * 60);
     return localMinutes >= CALL_WINDOW_START_MINUTES && localMinutes <= CALL_WINDOW_END_MINUTES;
@@ -237,7 +240,7 @@ export default {
         }
 
         if (path === "/api/calls/increment" && method === "POST") {
-            if (!isWithinCallCenterHours(new Date())) {
+            if (!isWithinCallCenterHours(new Date(), env.APP_ENV)) {
                 return json(
                     {
                         error: "Calls can be recorded only between 07:00 and 14:30 (GMT+2).",
@@ -258,6 +261,16 @@ export default {
             }
 
             await repo.insertCall(user.id);
+            const summary = await repo.getUserSummary(user.id);
+            return json({ ok: true, summary });
+        }
+
+        if (path === "/api/calls/remove-last" && method === "POST") {
+            const removed = await repo.deleteLastCall(user.id);
+            if (!removed) {
+                return json({ error: "No calls found to remove." }, 404);
+            }
+
             const summary = await repo.getUserSummary(user.id);
             return json({ ok: true, summary });
         }
